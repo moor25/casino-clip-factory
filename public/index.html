@@ -686,6 +686,9 @@
 </div>
 
 <script>
+  // When opened as a file:// (no server), point to the local Express server
+  const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+
   const THRESHOLD = 7;
   let currentData = [];
   let currentFilter = 'all';
@@ -728,7 +731,7 @@
     showSkeletons(6);
 
     try {
-      const res = await fetch('/api/analyze/scan?limit=20&threshold=' + THRESHOLD);
+      const res = await fetch(API_BASE + '/api/analyze/scan?limit=20&threshold=' + THRESHOLD);
       if (!res.ok) throw new Error('Server error ' + res.status);
       const data = await res.json();
       currentData = data.all ?? [];
@@ -874,10 +877,22 @@
 
   function extractSlug(raw) {
     const s = raw.trim().replace(/\/+$/, '');
-    const m = s.match(/kick\.com\/([^/?#\s]+)/i);
-    if (m) return m[1];
-    // bare slug or username
-    return s.replace(/^@/, '');
+
+    // kick.com/video/123 or kick.com/clip/123 → not a channel URL, grab the channel differently
+    // kick.com/channelname/videos/123 → extract channelname
+    const videoPath = s.match(/kick\.com\/([^/?#\s]+)\/(?:videos?|clips?)(?:\/|$)/i);
+    if (videoPath) return videoPath[1];
+
+    // kick.com/channelname?clip=... → extract channelname
+    const withQuery = s.match(/kick\.com\/([^/?#\s]+)/i);
+    if (withQuery && !['video', 'clip', 'category', 'search'].includes(withQuery[1].toLowerCase())) {
+      return withQuery[1];
+    }
+
+    // bare slug or @username
+    if (!s.includes('/') && !s.includes('.')) return s.replace(/^@/, '');
+
+    return null;
   }
 
   btnUrlAnalyze.addEventListener('click', analyzeSingleUrl);
@@ -894,7 +909,7 @@
     urlResult.classList.remove('show');
 
     try {
-      const res = await fetch('/api/analyze/' + encodeURIComponent(slug));
+      const res = await fetch(API_BASE + '/api/analyze/' + encodeURIComponent(slug));
       const data = await res.json();
 
       if (!res.ok) {
@@ -920,7 +935,7 @@
   // Load last scan results on page open
   (async () => {
     try {
-      const res = await fetch('/api/latest');
+      const res = await fetch(API_BASE + '/api/latest');
       if (!res.ok) return;
       const data = await res.json();
       currentData = data.all ?? [];
