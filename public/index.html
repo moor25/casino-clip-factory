@@ -455,10 +455,126 @@
     }
     .error-banner.show { display: block; margin-bottom: 16px; }
 
+    /* ── URL lookup section ── */
+    .url-section {
+      margin: 0 24px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .url-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 150ms;
+      min-width: 0;
+    }
+    .url-input::placeholder { color: var(--muted); opacity: 0.6; }
+    .url-input:focus { border-color: rgba(212,175,55,0.5); }
+
+    .btn-url-analyze {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: transparent;
+      color: var(--gold);
+      border: 1px solid rgba(212,175,55,0.4);
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-family: 'Fira Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 150ms, border-color 150ms;
+      flex-shrink: 0;
+    }
+    .btn-url-analyze:hover { background: rgba(212,175,55,0.1); border-color: var(--gold); }
+    .btn-url-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-url-analyze.spinning svg { animation: spin 1s linear infinite; }
+
+    .url-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+      opacity: 0.7;
+    }
+
+    .url-result {
+      margin-top: 14px;
+      display: none;
+    }
+    .url-result.show { display: block; }
+
+    .url-result-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .url-error {
+      font-size: 13px;
+      color: #fca5a5;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 24px;
+      margin-bottom: 16px;
+    }
+    .section-divider span {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+    }
+
     @media (max-width: 600px) {
       header { padding: 0 16px; }
       .stats-bar, .controls { padding-left: 16px; padding-right: 16px; }
       .grid { padding: 0 16px; }
+      .url-section { margin-left: 16px; margin-right: 16px; }
+      .section-divider { padding: 0 16px; }
       .logo-subtitle { display: none; }
     }
 
@@ -533,6 +649,32 @@
     <div class="toggle" id="auto-toggle"></div>
   </label>
 </div>
+
+<!-- ── Single stream URL lookup ── -->
+<div class="url-section">
+  <div class="url-section-label">Analyze specific stream</div>
+  <div class="url-row">
+    <input
+      class="url-input"
+      id="url-input"
+      type="text"
+      placeholder="https://kick.com/trainwreckstv  or just  trainwreckstv"
+      autocomplete="off"
+      spellcheck="false"
+    >
+    <button class="btn-url-analyze" id="btn-url-analyze">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Analyze
+    </button>
+  </div>
+  <div class="url-hint">Analyzes title, tags &amp; viewer count — not video content. Stream length has no effect on speed.</div>
+  <div class="url-result" id="url-result">
+    <div class="url-result-label">Result</div>
+    <div id="url-result-body"></div>
+  </div>
+</div>
+
+<div class="section-divider"><span>Live scan results</span></div>
 
 <div class="error-banner" id="error-banner"></div>
 
@@ -722,6 +864,57 @@
 
   function timeAgo(date) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Single URL analyze
+  const urlInput      = document.getElementById('url-input');
+  const btnUrlAnalyze = document.getElementById('btn-url-analyze');
+  const urlResult     = document.getElementById('url-result');
+  const urlResultBody = document.getElementById('url-result-body');
+
+  function extractSlug(raw) {
+    const s = raw.trim().replace(/\/+$/, '');
+    const m = s.match(/kick\.com\/([^/?#\s]+)/i);
+    if (m) return m[1];
+    // bare slug or username
+    return s.replace(/^@/, '');
+  }
+
+  btnUrlAnalyze.addEventListener('click', analyzeSingleUrl);
+  urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeSingleUrl(); });
+
+  async function analyzeSingleUrl() {
+    const raw = urlInput.value.trim();
+    if (!raw) return;
+    const slug = extractSlug(raw);
+    if (!slug) { showUrlError('Could not parse a channel name from that input.'); return; }
+
+    btnUrlAnalyze.disabled = true;
+    btnUrlAnalyze.classList.add('spinning');
+    urlResult.classList.remove('show');
+
+    try {
+      const res = await fetch('/api/analyze/' + encodeURIComponent(slug));
+      const data = await res.json();
+
+      if (!res.ok) {
+        showUrlError(data.error ?? ('Error ' + res.status));
+        return;
+      }
+
+      urlResultBody.innerHTML = cardHTML(data);
+      urlResult.classList.add('show');
+    } catch (err) {
+      showUrlError('Request failed: ' + err.message);
+    } finally {
+      btnUrlAnalyze.disabled = false;
+      btnUrlAnalyze.classList.remove('spinning');
+    }
+  }
+
+  function showUrlError(msg) {
+    urlResultBody.innerHTML = `<div class="url-error">${escHtml(msg)}</div>`;
+    urlResult.classList.add('show');
   }
 
   // Load last scan results on page open
