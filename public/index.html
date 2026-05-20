@@ -686,8 +686,12 @@
 </div>
 
 <script>
-  // When opened as a file:// (no server), point to the local Express server
-  const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+  // Always build an absolute origin so fetch() never gets a bare relative URL
+  const API_BASE = (function () {
+    const o = window.location.origin;
+    if (o && o !== 'null' && /^https?:\/\//.test(o)) return o;
+    return 'http://localhost:3000';
+  }());
 
   const THRESHOLD = 7;
   let currentData = [];
