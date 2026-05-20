@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cron = require('node-cron');
 const { getMultiCategoryStreams } = require('./kickClient');
 const { analyzeBatch } = require('./claudeAnalyzer');
@@ -10,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public')));
 
 // In-memory store for the latest auto-scan results
 let lastScanResults = null;
