@@ -19,7 +19,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../docs')));
 
 // In-memory store for the latest auto-scan results
 let lastScanResults = null;
